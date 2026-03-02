@@ -3,6 +3,7 @@ import re
 
 st.set_page_config(page_title="WMS Suporte", layout="wide")
 
+# ===== ESTILO =====
 st.markdown("""
 <style>
 .main {background-color: #f4f6f9;}
@@ -13,10 +14,7 @@ header {visibility: hidden;}
     border-radius: 10px;
     margin-bottom: 20px;
 }
-.topbar h1 {
-    color: white;
-    margin: 0;
-}
+.topbar h1 {color: white; margin: 0;}
 .card {
     background: white;
     padding: 20px;
@@ -24,127 +22,163 @@ header {visibility: hidden;}
     box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
     margin-bottom: 20px;
 }
+.chat-box {
+    background: #ffffff;
+    padding: 15px;
+    border-radius: 10px;
+    height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    margin-bottom: 10px;
+}
+.user-msg {color: blue;}
+.admin-msg {color: green;}
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="topbar"><h1>📦 WMS Suporte</h1></div>', unsafe_allow_html=True)
 
-perfil = st.sidebar.selectbox("Perfil", ["Usuário", "Admin"])
-
-menu_opcoes = ["WMS", "Meu Perfil"]
-if perfil == "Admin":
-    menu_opcoes.append("Usuários")
-
-menu = st.sidebar.radio("Menu", menu_opcoes)
-
+# ===== FUNÇÃO VALIDAÇÃO =====
 def validar_nce(nce):
     return bool(re.match(r"^\d{5,14}\.\d+$", nce))
 
-def somente_numeros(valor):
-    return valor.isdigit()
+# ===== CONTROLE CHAT =====
+if "chat_ativo" not in st.session_state:
+    st.session_state.chat_ativo = False
 
-def endereco_valido(endereco):
-    return bool(re.search(r"[A-Za-z]", endereco) and re.search(r"\d", endereco))
+if "mensagens" not in st.session_state:
+    st.session_state.mensagens = []
 
-if menu == "WMS":
-    st.subheader("Origem do Documento")
-    origem = st.radio("", ["TDC", "DPC", "IDC", "PDC", "FLD"], horizontal=True)
+# ===== PERFIL =====
+perfil = st.sidebar.selectbox("Perfil", ["Usuário", "Admin"])
 
-    operacao = st.selectbox(
-        "Operação",
-        ["Recebimento", "Armazenagem", "Transferência", "Inventário", "Separação", "Expedição"]
-    )
+# =====================================================
+# ===================== USUÁRIO =======================
+# =====================================================
+if perfil == "Usuário":
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
+    menu = st.sidebar.radio("Menu", ["Abrir Chamado", "Meu Perfil", "Chat"])
 
-    if operacao == "Recebimento":
-        agenda = st.text_input("Agenda *")
-        etiqueta = st.text_input("Etiqueta *")
-        nce = st.text_input("NCE * (6 a 15 contendo ponto)")
-        erro = st.text_area("Detalhar necessidade *")
+    # -------- ABRIR CHAMADO --------
+    if menu == "Abrir Chamado":
+        st.subheader("Abrir Chamado")
 
-        if st.button("Registrar"):
-            if not agenda or not etiqueta or not validar_nce(nce):
-                st.error("Preencha corretamente os campos obrigatórios")
+        operacao = st.selectbox(
+            "Operação",
+            ["Recebimento", "Armazenagem", "Transferência",
+             "Inventário", "Separação", "Expedição"]
+        )
+
+        nce = st.text_input("NCE * (ex: 12345.1)")
+        descricao = st.text_area("Descreva o problema *")
+
+        if st.button("Abrir Chamado"):
+            if not validar_nce(nce) or not descricao:
+                st.error("Preencha corretamente os campos obrigatórios.")
             else:
-                st.success("Chamado enviado ao suporte!")
+                st.session_state.chat_ativo = True
+                st.session_state.mensagens = []
+                st.session_state.mensagens.append(
+                    {"autor": "admin", "texto": "Chamado recebido. Suporte já está analisando."}
+                )
+                st.success("Chamado aberto com sucesso! 👇 Chat iniciado.")
 
-    elif operacao == "Armazenagem":
-        agenda = st.text_input("Agenda *")
-        etiqueta = st.text_input("Etiqueta *")
-        nce = st.text_input("NCE *")
-        endereco = st.text_input("Endereço *")
+        # CHAT AUTOMÁTICO
+        if st.session_state.chat_ativo:
+            st.subheader("Chat do Chamado")
 
-        if st.button("Registrar"):
-            if not somente_numeros(agenda) or not somente_numeros(etiqueta):
-                st.error("Agenda e Etiqueta devem conter apenas números")
-            elif not validar_nce(nce):
-                st.error("NCE inválido")
-            elif not endereco_valido(endereco):
-                st.error("Endereço inválido")
+            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+            for msg in st.session_state.mensagens:
+                if msg["autor"] == "usuario":
+                    st.markdown(f'<p class="user-msg">Você: {msg["texto"]}</p>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<p class="admin-msg">Suporte: {msg["texto"]}</p>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            nova_msg = st.text_input("Digite sua mensagem")
+            if st.button("Enviar"):
+                if nova_msg:
+                    st.session_state.mensagens.append(
+                        {"autor": "usuario", "texto": nova_msg}
+                    )
+                    st.success("Mensagem enviada!")
+
+    # -------- MEU PERFIL --------
+    elif menu == "Meu Perfil":
+        st.subheader("Cadastro do Usuário")
+        matricula = st.text_input("Matrícula *")
+        nome = st.text_input("Nome Completo *")
+
+        if st.button("Salvar Perfil"):
+            if not matricula or not nome:
+                st.error("Preencha os campos obrigatórios.")
             else:
-                st.success("Chamado enviado ao suporte!")
+                st.success("Perfil atualizado com sucesso!")
 
-    elif operacao == "Transferência":
-        quantidade = st.text_input("Quantidade *")
-        nce = st.text_input("NCE *")
+    # -------- CHAT GERAL --------
+    elif menu == "Chat":
+        st.subheader("Chat Online")
 
-        if st.button("Registrar"):
-            if not somente_numeros(quantidade):
-                st.error("Quantidade deve conter apenas números")
-            elif not validar_nce(nce):
-                st.error("NCE inválido")
-            else:
-                st.success("Chamado enviado ao suporte!")
-
-    elif operacao == "Inventário":
-        nce = st.text_input("NCE *")
-        saida = st.text_input("Endereço Saída *")
-        entrada = st.text_input("Endereço Entrada *")
-
-        if st.button("Registrar"):
-            if not validar_nce(nce):
-                st.error("NCE inválido")
-            elif not endereco_valido(saida) or not endereco_valido(entrada):
-                st.error("Endereço inválido")
-            else:
-                st.success("Chamado enviado ao suporte!")
-
-    elif operacao == "Separação":
-        carga = st.text_input("Carga *")
-        numero = st.text_input("Número da Separação *")
-        nce = st.text_input("NCE *")
-
-        if st.button("Registrar"):
-            if not somente_numeros(carga) or not somente_numeros(numero):
-                st.error("Carga e Número devem conter apenas números")
-            elif not validar_nce(nce):
-                st.error("NCE inválido")
-            else:
-                st.success("Chamado enviado ao suporte!")
-
-    elif operacao == "Expedição":
-        st.text_input("Carga")
-        st.text_input("Número da Separação")
-        st.text_input("NCE")
-
-        if st.button("Registrar"):
-            st.success("Chamado enviado ao suporte!")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-elif menu == "Meu Perfil":
-    st.subheader("Cadastro do Usuário")
-    matricula = st.text_input("Matrícula *")
-    nome = st.text_input("Nome Completo *")
-
-    if st.button("Salvar"):
-        if not matricula or not nome:
-            st.error("Preencha os campos obrigatórios")
+        if not st.session_state.chat_ativo:
+            st.info("Nenhum chamado ativo.")
         else:
-            st.success("Perfil atualizado com sucesso!")
+            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+            for msg in st.session_state.mensagens:
+                if msg["autor"] == "usuario":
+                    st.markdown(f'<p class="user-msg">Você: {msg["texto"]}</p>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<p class="admin-msg">Suporte: {msg["texto"]}</p>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-elif menu == "Usuários" and perfil == "Admin":
-    st.subheader("Gerenciamento de Usuários")
-    st.info("Área futura para cadastro de usuários.")
+            nova_msg = st.text_input("Digite sua mensagem")
+            if st.button("Enviar"):
+                if nova_msg:
+                    st.session_state.mensagens.append(
+                        {"autor": "usuario", "texto": nova_msg}
+                    )
+                    st.success("Mensagem enviada!")
 
+# =====================================================
+# ======================= ADMIN =======================
+# =====================================================
+elif perfil == "Admin":
+
+    menu = st.sidebar.radio("Menu", ["Chamados Abertos", "Chat Online", "Usuários"])
+
+    # -------- TELA PRINCIPAL ADMIN --------
+    if menu == "Chamados Abertos":
+        st.subheader("Chamados Abertos")
+
+        st.markdown("""
+        🔹 Chamado #001 - Recebimento - Em andamento  
+        🔹 Chamado #002 - Inventário - Aguardando resposta  
+        🔹 Chamado #003 - Separação - Novo  
+        """)
+
+    # -------- CHAT ONLINE --------
+    elif menu == "Chat Online":
+        st.subheader("Chat Online com Usuário")
+
+        if not st.session_state.chat_ativo:
+            st.info("Nenhum chamado ativo no momento.")
+        else:
+            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+            for msg in st.session_state.mensagens:
+                if msg["autor"] == "usuario":
+                    st.markdown(f'<p class="user-msg">Usuário: {msg["texto"]}</p>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<p class="admin-msg">Você: {msg["texto"]}</p>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            resposta = st.text_input("Responder usuário")
+            if st.button("Enviar Resposta"):
+                if resposta:
+                    st.session_state.mensagens.append(
+                        {"autor": "admin", "texto": resposta}
+                    )
+                    st.success("Resposta enviada!")
+
+    # -------- USUÁRIOS --------
+    elif menu == "Usuários":
+        st.subheader("Gerenciamento de Usuários")
+        st.info("Área reservada para controle de usuários.")
