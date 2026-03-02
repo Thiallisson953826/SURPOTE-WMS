@@ -1,10 +1,9 @@
 import streamlit as st
-import re
 import uuid
 
 st.set_page_config(page_title="WMS Suporte", layout="wide")
 
-# ================= ESTILO NAVBAR =================
+# ================= ESTILO =================
 st.markdown("""
 <style>
 .main {background-color: #0f172a;}
@@ -14,19 +13,6 @@ header {visibility: hidden;}
     background-color: #111827;
     padding: 15px 30px;
     border-radius: 12px;
-    display: flex;
-    gap: 40px;
-    align-items: center;
-}
-
-.nav-item {
-    color: white;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.nav-item:hover {
-    color: #38bdf8;
 }
 
 .card {
@@ -50,7 +36,7 @@ header {visibility: hidden;}
 
 # ================= SESSION =================
 if "convites" not in st.session_state:
-    st.session_state.convites = {}  # email: token
+    st.session_state.convites = {}
 
 if "usuario_logado" not in st.session_state:
     st.session_state.usuario_logado = None
@@ -61,20 +47,22 @@ if "perfil" not in st.session_state:
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
-# ================= LOGIN SIMPLES =================
+# ================= LOGIN =================
 st.sidebar.title("Login")
 
 tipo = st.sidebar.selectbox("Tipo", ["Admin", "Usuário"])
 
+# ===== ADMIN LOGIN =====
 if tipo == "Admin":
     senha = st.sidebar.text_input("Senha Admin", type="password")
     if st.sidebar.button("Entrar"):
-        if senha == "admin123":
+        if senha == "1234":   # 🔥 SENHA ALTERADA AQUI
             st.session_state.usuario_logado = "admin"
             st.session_state.perfil = "Admin"
         else:
             st.sidebar.error("Senha incorreta")
 
+# ===== USUÁRIO LOGIN =====
 else:
     email = st.sidebar.text_input("Email")
     token = st.sidebar.text_input("Token Convite")
@@ -88,12 +76,10 @@ else:
 # ================= NAVBAR =================
 if st.session_state.perfil:
 
-    st.markdown('<div class="navbar">', unsafe_allow_html=True)
-
     if st.session_state.perfil == "Admin":
         menu = st.radio(
             "",
-            ["WMS", "Suporte", "Meu Perfil", "Usuários"],
+            ["WMS", "Chamados", "Meu Perfil", "Usuários"],
             horizontal=True,
             label_visibility="collapsed"
         )
@@ -105,8 +91,6 @@ if st.session_state.perfil:
             label_visibility="collapsed"
         )
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
 # =====================================================
 # ====================== ADMIN =========================
 # =====================================================
@@ -115,10 +99,10 @@ if st.session_state.perfil == "Admin":
     if menu == "WMS":
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.title("Painel Administrativo")
-        st.write("Visão geral do sistema WMS.")
+        st.write("Visão geral do sistema.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    if menu == "Suporte":
+    if menu == "Chamados":
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.title("Chamados Abertos")
         st.write("🔹 Chamado #001 - Em andamento")
@@ -144,7 +128,8 @@ if st.session_state.perfil == "Admin":
                 token = str(uuid.uuid4())[:8]
                 st.session_state.convites[novo_email] = token
                 st.success(f"Convite gerado!\n\nEmail: {novo_email}\nToken: {token}")
-                st.info("Envie esse token para o usuário por email.")
+                st.info("Envie esse token por email ao usuário.")
+
         st.markdown('</div>', unsafe_allow_html=True)
 
 # =====================================================
@@ -172,7 +157,9 @@ if st.session_state.perfil == "Usuário":
             if nce and descricao:
                 st.session_state.chat = []
                 st.session_state.chat.append("Suporte: Chamado recebido.")
+                st.session_state.chat.append("Suporte: Nosso time já foi notificado.")
                 st.success("Chamado aberto! Vá para o Chat.")
+                st.rerun()  # 🔥 já atualiza para ir pro chat
             else:
                 st.error("Preencha todos os campos.")
 
@@ -200,4 +187,6 @@ if st.session_state.perfil == "Usuário":
             if nova_msg:
                 st.session_state.chat.append(f"Você: {nova_msg}")
                 st.success("Mensagem enviada.")
+                st.rerun()
+
         st.markdown('</div>', unsafe_allow_html=True)
