@@ -26,10 +26,11 @@ if "chamados" not in st.session_state:
 def gerar_token():
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
+# NCE mínimo 6 números antes do ponto e pelo menos 1 depois
 def validar_nce(nce):
     if not nce:
         return False
-    return re.match(r"^\d{5,14}\.\d$", nce)
+    return re.match(r"^\d{6,}\.\d+$", nce)
 
 # ================= LOGIN =================
 st.sidebar.title("Login")
@@ -56,13 +57,13 @@ else:
         matricula = st.sidebar.text_input("Matrícula")
         senha = st.sidebar.text_input("Senha", type="password")
 
-        if st.sidebar.button("Criar"):
+        if st.sidebar.button("Criar Perfil"):
             if email in st.session_state.convites and st.session_state.convites[email] == token:
                 st.session_state.usuarios[email] = {
                     "matricula": matricula,
                     "senha": senha
                 }
-                st.success("Perfil criado!")
+                st.success("Perfil criado com sucesso!")
             else:
                 st.sidebar.error("Convite inválido")
 
@@ -83,26 +84,26 @@ else:
 # ============================================================
 if st.session_state.perfil == "Admin":
 
-    menu = st.radio("", ["Chamados", "Convidar"], horizontal=True)
+    menu = st.radio("", ["Chamados", "Convidar Usuário"], horizontal=True)
 
-    if menu == "Convidar":
+    if menu == "Convidar Usuário":
         st.title("Convidar Usuário")
         email = st.text_input("Email")
 
         if st.button("Gerar Token"):
             token = gerar_token()
             st.session_state.convites[email] = token
-            st.success(f"Token: {token}")
+            st.success(f"Token gerado: {token}")
 
     if menu == "Chamados":
         st.title("Chamados Abertos")
 
         if st.session_state.chamados:
-            chamado = st.selectbox("Selecionar", list(st.session_state.chamados.keys()))
+            chamado = st.selectbox("Selecionar Chamado", list(st.session_state.chamados.keys()))
             dados = st.session_state.chamados[chamado]
 
-            st.subheader("Dados")
-            st.write(dados["criterio"])
+            st.subheader("Dados do Chamado")
+            st.write("Critério:", dados["criterio"])
             st.write(dados["dados"])
 
             st.subheader("Chat")
@@ -146,12 +147,12 @@ if st.session_state.perfil == "Usuário":
             if criterio == "Recebimento":
                 agenda = st.text_input("Agenda *")
                 etiqueta = st.text_input("Etiqueta *")
-                nce = st.text_input("NCE (00000.0) *")
+                nce = st.text_input("NCE (ex: 196369.65421378) *")
                 nota = st.text_input("Nota")
 
             elif criterio == "Armazenagem":
-                agenda = st.text_input("Agenda *")
-                etiqueta = st.text_input("Etiqueta *")
+                agenda = st.text_input("Agenda * (somente números)")
+                etiqueta = st.text_input("Etiqueta * (somente números)")
                 nce = st.text_input("NCE *")
                 endereco = st.text_input("Endereço *")
 
@@ -184,7 +185,7 @@ if st.session_state.perfil == "Usuário":
                         dados = {"Agenda": agenda, "Etiqueta": etiqueta, "NCE": nce, "Nota": nota}
 
                 elif criterio == "Armazenagem":
-                    if not agenda or not etiqueta or not validar_nce(nce) or not endereco:
+                    if not agenda.isdigit() or not etiqueta.isdigit() or not validar_nce(nce) or not endereco:
                         valido = False
                     else:
                         dados = {"Agenda": agenda, "Etiqueta": etiqueta, "NCE": nce, "Endereço": endereco}
@@ -196,7 +197,7 @@ if st.session_state.perfil == "Usuário":
                         dados = {"NCE": nce, "Saída": saida, "Entrada": entrada}
 
                 elif criterio == "Separação":
-                    if not carga or not numero_sep or not validar_nce(nce):
+                    if not carga.isdigit() or not numero_sep.isdigit() or not validar_nce(nce):
                         valido = False
                     else:
                         dados = {"Carga": carga, "Separação": numero_sep, "NCE": nce}
@@ -205,7 +206,6 @@ if st.session_state.perfil == "Usuário":
                     dados = {"Carga": carga, "Separação": numero_sep, "NCE": nce}
 
                 if valido and dados:
-
                     id_chamado = str(uuid.uuid4())[:8]
 
                     st.session_state.chamados[id_chamado] = {
@@ -214,14 +214,12 @@ if st.session_state.perfil == "Usuário":
                         "dados": dados,
                         "chat": [
                             f"Sistema: Chamado aberto - {criterio}",
-                            f"Erro: {erro}"
+                            f"Erro informado: {erro}"
                         ]
                     }
 
                     st.success("Chamado aberto com sucesso!")
-                    st.session_state.menu = "Chat"
                     st.rerun()
-
                 else:
                     st.error("Preencha corretamente os campos obrigatórios.")
 
