@@ -1,29 +1,43 @@
 import streamlit as st
 import re
+import uuid
 
 st.set_page_config(page_title="WMS Suporte", layout="wide")
 
-# ===== ESTILO =====
+# ================= ESTILO NAVBAR =================
 st.markdown("""
 <style>
-.main {background-color: #f4f6f9;}
+.main {background-color: #0f172a;}
 header {visibility: hidden;}
-.topbar {
-    background-color: #0f172a;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 20px;
+
+.navbar {
+    background-color: #111827;
+    padding: 15px 30px;
+    border-radius: 12px;
+    display: flex;
+    gap: 40px;
+    align-items: center;
 }
-.topbar h1 {color: white; margin: 0;}
+
+.nav-item {
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.nav-item:hover {
+    color: #38bdf8;
+}
+
 .card {
     background: white;
-    padding: 20px;
+    padding: 25px;
     border-radius: 12px;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
+    margin-top: 20px;
 }
+
 .chat-box {
-    background: #ffffff;
+    background: #f9fafb;
     padding: 15px;
     border-radius: 10px;
     height: 300px;
@@ -31,154 +45,159 @@ header {visibility: hidden;}
     border: 1px solid #ddd;
     margin-bottom: 10px;
 }
-.user-msg {color: blue;}
-.admin-msg {color: green;}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="topbar"><h1>📦 WMS Suporte</h1></div>', unsafe_allow_html=True)
+# ================= SESSION =================
+if "convites" not in st.session_state:
+    st.session_state.convites = {}  # email: token
 
-# ===== FUNÇÃO VALIDAÇÃO =====
-def validar_nce(nce):
-    return bool(re.match(r"^\d{5,14}\.\d+$", nce))
+if "usuario_logado" not in st.session_state:
+    st.session_state.usuario_logado = None
 
-# ===== CONTROLE CHAT =====
-if "chat_ativo" not in st.session_state:
-    st.session_state.chat_ativo = False
+if "perfil" not in st.session_state:
+    st.session_state.perfil = None
 
-if "mensagens" not in st.session_state:
-    st.session_state.mensagens = []
+if "chat" not in st.session_state:
+    st.session_state.chat = []
 
-# ===== PERFIL =====
-perfil = st.sidebar.selectbox("Perfil", ["Usuário", "Admin"])
+# ================= LOGIN SIMPLES =================
+st.sidebar.title("Login")
 
-# =====================================================
-# ===================== USUÁRIO =======================
-# =====================================================
-if perfil == "Usuário":
+tipo = st.sidebar.selectbox("Tipo", ["Admin", "Usuário"])
 
-    menu = st.sidebar.radio("Menu", ["Abrir Chamado", "Meu Perfil", "Chat"])
+if tipo == "Admin":
+    senha = st.sidebar.text_input("Senha Admin", type="password")
+    if st.sidebar.button("Entrar"):
+        if senha == "admin123":
+            st.session_state.usuario_logado = "admin"
+            st.session_state.perfil = "Admin"
+        else:
+            st.sidebar.error("Senha incorreta")
 
-    # -------- ABRIR CHAMADO --------
-    if menu == "Abrir Chamado":
-        st.subheader("Abrir Chamado")
+else:
+    email = st.sidebar.text_input("Email")
+    token = st.sidebar.text_input("Token Convite")
+    if st.sidebar.button("Entrar"):
+        if email in st.session_state.convites and st.session_state.convites[email] == token:
+            st.session_state.usuario_logado = email
+            st.session_state.perfil = "Usuário"
+        else:
+            st.sidebar.error("Convite inválido")
 
-        operacao = st.selectbox(
-            "Operação",
-            ["Recebimento", "Armazenagem", "Transferência",
-             "Inventário", "Separação", "Expedição"]
+# ================= NAVBAR =================
+if st.session_state.perfil:
+
+    st.markdown('<div class="navbar">', unsafe_allow_html=True)
+
+    if st.session_state.perfil == "Admin":
+        menu = st.radio(
+            "",
+            ["WMS", "Suporte", "Meu Perfil", "Usuários"],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+    else:
+        menu = st.radio(
+            "",
+            ["Novo Registro", "Meu Perfil", "Chat"],
+            horizontal=True,
+            label_visibility="collapsed"
         )
 
-        nce = st.text_input("NCE * (ex: 12345.1)")
-        descricao = st.text_area("Descreva o problema *")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =====================================================
+# ====================== ADMIN =========================
+# =====================================================
+if st.session_state.perfil == "Admin":
+
+    if menu == "WMS":
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("Painel Administrativo")
+        st.write("Visão geral do sistema WMS.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if menu == "Suporte":
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("Chamados Abertos")
+        st.write("🔹 Chamado #001 - Em andamento")
+        st.write("🔹 Chamado #002 - Aguardando usuário")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if menu == "Meu Perfil":
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("Perfil Admin")
+        st.text_input("Nome")
+        st.text_input("Email")
+        st.button("Salvar")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if menu == "Usuários":
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("Convidar Usuário")
+
+        novo_email = st.text_input("Email do Usuário")
+
+        if st.button("Enviar Convite"):
+            if novo_email:
+                token = str(uuid.uuid4())[:8]
+                st.session_state.convites[novo_email] = token
+                st.success(f"Convite gerado!\n\nEmail: {novo_email}\nToken: {token}")
+                st.info("Envie esse token para o usuário por email.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# =====================================================
+# ====================== USUÁRIO =======================
+# =====================================================
+if st.session_state.perfil == "Usuário":
+
+    if menu == "Novo Registro":
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("Abrir Chamado")
+
+        operacao = st.selectbox("Operação", [
+            "Recebimento",
+            "Armazenagem",
+            "Transferência",
+            "Inventário",
+            "Separação",
+            "Expedição"
+        ])
+
+        nce = st.text_input("NCE (ex: 12345.1)")
+        descricao = st.text_area("Descreva o problema")
 
         if st.button("Abrir Chamado"):
-            if not validar_nce(nce) or not descricao:
-                st.error("Preencha corretamente os campos obrigatórios.")
+            if nce and descricao:
+                st.session_state.chat = []
+                st.session_state.chat.append("Suporte: Chamado recebido.")
+                st.success("Chamado aberto! Vá para o Chat.")
             else:
-                st.session_state.chat_ativo = True
-                st.session_state.mensagens = []
-                st.session_state.mensagens.append(
-                    {"autor": "admin", "texto": "Chamado recebido. Suporte já está analisando."}
-                )
-                st.success("Chamado aberto com sucesso! 👇 Chat iniciado.")
+                st.error("Preencha todos os campos.")
 
-        # CHAT AUTOMÁTICO
-        if st.session_state.chat_ativo:
-            st.subheader("Chat do Chamado")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-            for msg in st.session_state.mensagens:
-                if msg["autor"] == "usuario":
-                    st.markdown(f'<p class="user-msg">Você: {msg["texto"]}</p>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<p class="admin-msg">Suporte: {msg["texto"]}</p>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+    if menu == "Meu Perfil":
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("Finalizar Cadastro")
+        st.text_input("Nome Completo")
+        st.text_input("Matrícula")
+        st.button("Salvar Cadastro")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-            nova_msg = st.text_input("Digite sua mensagem")
-            if st.button("Enviar"):
-                if nova_msg:
-                    st.session_state.mensagens.append(
-                        {"autor": "usuario", "texto": nova_msg}
-                    )
-                    st.success("Mensagem enviada!")
+    if menu == "Chat":
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("Chat com Suporte")
 
-    # -------- MEU PERFIL --------
-    elif menu == "Meu Perfil":
-        st.subheader("Cadastro do Usuário")
-        matricula = st.text_input("Matrícula *")
-        nome = st.text_input("Nome Completo *")
+        st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+        for msg in st.session_state.chat:
+            st.write(msg)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        if st.button("Salvar Perfil"):
-            if not matricula or not nome:
-                st.error("Preencha os campos obrigatórios.")
-            else:
-                st.success("Perfil atualizado com sucesso!")
-
-    # -------- CHAT GERAL --------
-    elif menu == "Chat":
-        st.subheader("Chat Online")
-
-        if not st.session_state.chat_ativo:
-            st.info("Nenhum chamado ativo.")
-        else:
-            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-            for msg in st.session_state.mensagens:
-                if msg["autor"] == "usuario":
-                    st.markdown(f'<p class="user-msg">Você: {msg["texto"]}</p>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<p class="admin-msg">Suporte: {msg["texto"]}</p>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            nova_msg = st.text_input("Digite sua mensagem")
-            if st.button("Enviar"):
-                if nova_msg:
-                    st.session_state.mensagens.append(
-                        {"autor": "usuario", "texto": nova_msg}
-                    )
-                    st.success("Mensagem enviada!")
-
-# =====================================================
-# ======================= ADMIN =======================
-# =====================================================
-elif perfil == "Admin":
-
-    menu = st.sidebar.radio("Menu", ["Chamados Abertos", "Chat Online", "Usuários"])
-
-    # -------- TELA PRINCIPAL ADMIN --------
-    if menu == "Chamados Abertos":
-        st.subheader("Chamados Abertos")
-
-        st.markdown("""
-        🔹 Chamado #001 - Recebimento - Em andamento  
-        🔹 Chamado #002 - Inventário - Aguardando resposta  
-        🔹 Chamado #003 - Separação - Novo  
-        """)
-
-    # -------- CHAT ONLINE --------
-    elif menu == "Chat Online":
-        st.subheader("Chat Online com Usuário")
-
-        if not st.session_state.chat_ativo:
-            st.info("Nenhum chamado ativo no momento.")
-        else:
-            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
-            for msg in st.session_state.mensagens:
-                if msg["autor"] == "usuario":
-                    st.markdown(f'<p class="user-msg">Usuário: {msg["texto"]}</p>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<p class="admin-msg">Você: {msg["texto"]}</p>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            resposta = st.text_input("Responder usuário")
-            if st.button("Enviar Resposta"):
-                if resposta:
-                    st.session_state.mensagens.append(
-                        {"autor": "admin", "texto": resposta}
-                    )
-                    st.success("Resposta enviada!")
-
-    # -------- USUÁRIOS --------
-    elif menu == "Usuários":
-        st.subheader("Gerenciamento de Usuários")
-        st.info("Área reservada para controle de usuários.")
+        nova_msg = st.text_input("Mensagem")
+        if st.button("Enviar"):
+            if nova_msg:
+                st.session_state.chat.append(f"Você: {nova_msg}")
+                st.success("Mensagem enviada.")
+        st.markdown('</div>', unsafe_allow_html=True)
