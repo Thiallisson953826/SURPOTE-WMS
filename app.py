@@ -3,12 +3,10 @@ from datetime import datetime
 
 st.set_page_config(page_title="SUPORTE WMS", layout="wide")
 
-# =========================
-# CSS
-# =========================
+# ================= ESTILO =================
 st.markdown("""
 <style>
-.main { border-top: 10px solid black; }
+.main { border-top: 8px solid black; }
 .stButton>button {
     background-color: black;
     color: white;
@@ -17,51 +15,43 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# =========================
-# SESSION STATE INICIAL
-# =========================
+# ================= SESSION =================
 if "pagina" not in st.session_state:
     st.session_state.pagina = "inicio"
-
-if "responsaveis" not in st.session_state:
-    st.session_state.responsaveis = ["Thiallisson","Kelson","Edvaldo","Hernandes"]
 
 if "chamados" not in st.session_state:
     st.session_state.chamados = []
 
-# =========================
-# PAGINA INICIAL
-# =========================
+if "responsaveis" not in st.session_state:
+    st.session_state.responsaveis = ["THIALLISSON","KELSON","EDVALDO","HERNANDES"]
+
+# ================= INICIO =================
 if st.session_state.pagina == "inicio":
 
     st.title("SUPORTE WMS")
 
     col1, col2 = st.columns(2)
 
-    if col1.button("Login Usuário"):
+    if col1.button("Usuário"):
         st.session_state.pagina = "login_usuario"
         st.rerun()
 
-    if col2.button("Login Admin"):
+    if col2.button("Admin"):
         st.session_state.pagina = "login_admin"
         st.rerun()
 
-# =========================
-# LOGIN USUARIO
-# =========================
+# ================= LOGIN USUARIO =================
 elif st.session_state.pagina == "login_usuario":
 
     st.title("Login Usuário")
 
-    usuario = st.text_input("Usuário")
     nome = st.text_input("Nome")
     origem = st.selectbox("Origem", ["TDC","IDC","PDC","DPC","FLD"])
 
     col1, col2 = st.columns(2)
 
     if col1.button("Entrar"):
-        if usuario and nome:
-            st.session_state.usuario = usuario
+        if nome:
             st.session_state.nome = nome
             st.session_state.origem = origem
             st.session_state.pagina = "usuario"
@@ -71,9 +61,7 @@ elif st.session_state.pagina == "login_usuario":
         st.session_state.pagina = "inicio"
         st.rerun()
 
-# =========================
-# LOGIN ADMIN
-# =========================
+# ================= LOGIN ADMIN =================
 elif st.session_state.pagina == "login_admin":
 
     st.title("Login Admin")
@@ -93,9 +81,7 @@ elif st.session_state.pagina == "login_admin":
         st.session_state.pagina = "inicio"
         st.rerun()
 
-# =========================
-# TELA USUARIO
-# =========================
+# ================= TELA USUARIO =================
 elif st.session_state.pagina == "usuario":
 
     st.title("Abrir Chamado")
@@ -109,71 +95,34 @@ elif st.session_state.pagina == "usuario":
         "Inventário","Separação","Expedição"
     ])
 
-    nota = agenda = nce = etiqueta = endereco = ""
-    end_saida = end_entrada = carga = separacao = ""
-
-    if tipo == "Recebimento":
-        nota = st.text_input("Nota *")
-        agenda = st.text_input("Agenda")
-        nce = st.text_input("NCE *")
-
-    elif tipo == "Armazenagem":
-        agenda = st.text_input("Agenda *")
-        etiqueta = st.text_input("Etiqueta *")
-        endereco = st.text_input("Endereço")
-
-    elif tipo == "Transferência":
-        end_saida = st.text_input("Endereço Saída *")
-        end_entrada = st.text_input("Endereço Entrada *")
-        nce = st.text_input("NCE *")
-
-    elif tipo == "Inventário":
-        nce = st.text_input("NCE *")
-        endereco = st.text_input("Endereço *")
-
-    elif tipo == "Separação":
-        carga = st.text_input("Carga *")
-        separacao = st.text_input("Separação")
-        nota = st.text_input("Nota *")
-
-    elif tipo == "Expedição":
-        carga = st.text_input("Carga *")
-        separacao = st.text_input("Separação *")
-        nota = st.text_input("Nota *")
-
-    descricao = st.text_area("Descrição do erro *")
+    descricao = st.text_area("Descrição detalhada do erro *")
 
     responsavel = st.selectbox("Responsável", st.session_state.responsaveis)
 
-    if st.button("Criar Chamado"):
+    if st.button("Enviar Chamado"):
 
-        chamado = {
-            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "Usuario": st.session_state.nome,
-            "Tipo": tipo,
-            "Nota": nota,
-            "Agenda": agenda,
-            "NCE": nce,
-            "Etiqueta": etiqueta,
-            "Endereço": endereco,
-            "Endereço Saída": end_saida,
-            "Endereço Entrada": end_entrada,
-            "Carga": carga,
-            "Separação": separacao,
-            "Descrição": descricao,
-            "Responsável": responsavel,
-            "Status": "Aberto",
-            "Chat": [f"{st.session_state.nome}: Chamado aberto"]
-        }
+        if not descricao:
+            st.error("Descrição é obrigatória")
+        else:
+            chamado = {
+                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "Usuario": st.session_state.nome,
+                "Origem": st.session_state.origem,
+                "Tipo": tipo,
+                "Descricao": descricao,
+                "Responsavel": responsavel,
+                "Status": "Aberto",
+                "Chat": [
+                    f"{st.session_state.nome}: Chamado aberto - {descricao}"
+                ]
+            }
 
-        st.session_state.chamados.append(chamado)
+            st.session_state.chamados.append(chamado)
 
-        st.success("Chamado criado e enviado ao Admin")
-        st.rerun()
+            st.success("Chamado enviado com sucesso")
+            st.rerun()
 
-# =========================
-# TELA ADMIN
-# =========================
+# ================= TELA ADMIN =================
 elif st.session_state.pagina == "admin":
 
     st.title("Painel Admin")
@@ -184,37 +133,58 @@ elif st.session_state.pagina == "admin":
 
     st.subheader("Gerenciar Responsáveis")
 
-    novo = st.text_input("Novo Nome")
+    novo = st.text_input("Novo responsável")
     if st.button("Adicionar"):
         if novo:
-            st.session_state.responsaveis.append(novo)
+            st.session_state.responsaveis.append(novo.upper())
+            st.success("Adicionado")
+
+    remover = st.selectbox("Remover responsável", [""] + st.session_state.responsaveis)
+    if st.button("Remover"):
+        if remover:
+            st.session_state.responsaveis.remove(remover)
+            st.success("Removido")
 
     st.divider()
 
-    for i, ch in enumerate(st.session_state.chamados):
+    st.subheader("Chamados")
 
-        with st.expander(f"{i+1} - {ch['Tipo']} - {ch['Status']}"):
+    if not st.session_state.chamados:
+        st.info("Nenhum chamado aberto.")
+    else:
+        for i, ch in enumerate(st.session_state.chamados):
 
-            st.write(ch)
+            with st.expander(f"{i+1} - {ch['Tipo']} - {ch['Status']}"):
 
-            status = st.selectbox(
-                "Status",
-                ["Aberto","Em Atendimento","Finalizado"],
-                key=f"status{i}"
-            )
-            ch["Status"] = status
+                st.write("Usuário:", ch["Usuario"])
+                st.write("Origem:", ch["Origem"])
+                st.write("Responsável:", ch["Responsavel"])
+                st.write("Descrição:", ch["Descricao"])
 
-            resolver = st.text_input("Resolvido por", key=f"res{i}")
-            if resolver:
-                ch["Resolvido por"] = resolver
+                novo_status = st.selectbox(
+                    "Status",
+                    ["Aberto","Em Atendimento","Finalizado"],
+                    index=["Aberto","Em Atendimento","Finalizado"].index(ch["Status"]),
+                    key=f"status{i}"
+                )
+                ch["Status"] = novo_status
 
-            msg = st.text_input("Mensagem", key=f"chat{i}")
-            if st.button("Enviar", key=f"btn{i}"):
-                ch["Chat"].append(f"Admin: {msg}")
+                resolvido = st.text_input("Resolvido por", key=f"res{i}")
+                if resolvido:
+                    ch["Resolvido por"] = resolvido
 
-            for m in ch["Chat"]:
-                st.write(m)
+                st.markdown("### Chat")
 
-            if st.button("Excluir", key=f"del{i}"):
-                st.session_state.chamados.pop(i)
-                st.rerun()
+                for msg in ch["Chat"]:
+                    st.write(msg)
+
+                nova_msg = st.text_input("Mensagem", key=f"msg{i}")
+
+                if st.button("Enviar Mensagem", key=f"btn{i}"):
+                    if nova_msg:
+                        ch["Chat"].append(f"ADMIN: {nova_msg}")
+                        st.rerun()
+
+                if st.button("Excluir Chamado", key=f"del{i}"):
+                    st.session_state.chamados.pop(i)
+                    st.rerun()
