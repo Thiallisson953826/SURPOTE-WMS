@@ -3,19 +3,38 @@ from datetime import datetime
 
 st.set_page_config(page_title="SUPORTE WMS", layout="wide")
 
-# ================= ESTILO =================
+# ================= ESTILO MODERNO =================
 st.markdown("""
 <style>
-.main { border-top: 8px solid black; }
-.stButton>button {
-    background-color: black;
-    color: white;
-    font-weight: bold;
+.main {background-color:#f4f6fa;}
+.topbar {
+    background-color:#111;
+    padding:15px;
+    border-radius:0 0 15px 15px;
 }
+.topbar h1 {color:white;}
+.card {
+    background:white;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0px 4px 15px rgba(0,0,0,0.08);
+    margin-bottom:20px;
+}
+.stButton>button {
+    border-radius:8px;
+    font-weight:bold;
+    height:40px;
+}
+.btn-primary button {background:#0052cc;color:white;}
+.btn-success button {background:#28a745;color:white;}
+.btn-danger button {background:#dc3545;color:white;}
+.status-aberto {color:#dc3545;font-weight:bold;}
+.status-andamento {color:#ffc107;font-weight:bold;}
+.status-finalizado {color:#28a745;font-weight:bold;}
 </style>
 """, unsafe_allow_html=True)
 
-# ================= SESSION =================
+# ================= ESTADO =================
 if "pagina" not in st.session_state:
     st.session_state.pagina = "inicio"
 
@@ -25,166 +44,147 @@ if "chamados" not in st.session_state:
 if "responsaveis" not in st.session_state:
     st.session_state.responsaveis = ["THIALLISSON","KELSON","EDVALDO","HERNANDES"]
 
-# ================= INICIO =================
+# ================= PAGINA INICIAL =================
 if st.session_state.pagina == "inicio":
-
-    st.title("SUPORTE WMS")
-
+    st.markdown("<div class='topbar'><h1>SUPORTE WMS</h1></div>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
 
-    if col1.button("Usuário"):
-        st.session_state.pagina = "login_usuario"
-        st.rerun()
-
-    if col2.button("Admin"):
+    if col1.button("Entrar como Usuário"):
+        st.session_state.pagina = "usuario"
+    if col2.button("Entrar como Admin"):
         st.session_state.pagina = "login_admin"
-        st.rerun()
-
-# ================= LOGIN USUARIO =================
-elif st.session_state.pagina == "login_usuario":
-
-    st.title("Login Usuário")
-
-    nome = st.text_input("Nome")
-    origem = st.selectbox("Origem", ["TDC","IDC","PDC","DPC","FLD"])
-
-    col1, col2 = st.columns(2)
-
-    if col1.button("Entrar"):
-        if nome:
-            st.session_state.nome = nome
-            st.session_state.origem = origem
-            st.session_state.pagina = "usuario"
-            st.rerun()
-
-    if col2.button("Voltar"):
-        st.session_state.pagina = "inicio"
-        st.rerun()
 
 # ================= LOGIN ADMIN =================
 elif st.session_state.pagina == "login_admin":
-
     st.title("Login Admin")
-
     senha = st.text_input("Senha", type="password")
 
     col1, col2 = st.columns(2)
-
     if col1.button("Entrar"):
         if senha == "1234":
             st.session_state.pagina = "admin"
-            st.rerun()
         else:
             st.error("Senha incorreta")
 
     if col2.button("Voltar"):
         st.session_state.pagina = "inicio"
-        st.rerun()
 
 # ================= TELA USUARIO =================
 elif st.session_state.pagina == "usuario":
 
-    st.title("Abrir Chamado")
+    st.markdown("<div class='topbar'><h1>Abrir Chamado</h1></div>", unsafe_allow_html=True)
 
-    if st.button("Logout"):
+    if st.button("Voltar"):
         st.session_state.pagina = "inicio"
-        st.rerun()
 
-    tipo = st.selectbox("Tipo",[
-        "Recebimento","Armazenagem","Transferência",
-        "Inventário","Separação","Expedição"
-    ])
+    with st.container():
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-    descricao = st.text_area("Descrição detalhada do erro *")
+        nome = st.text_input("Seu Nome")
+        origem = st.selectbox("Origem", ["TDC","IDC","PDC","DPC","FLD"])
 
-    responsavel = st.selectbox("Responsável", st.session_state.responsaveis)
+        tipo = st.selectbox("Tipo de Operação", [
+            "Recebimento","Armazenagem","Transferência",
+            "Inventário","Separação","Expedição"
+        ])
 
-    if st.button("Enviar Chamado"):
+        descricao = st.text_area("Descreva o problema *")
 
-        if not descricao:
-            st.error("Descrição é obrigatória")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    if st.button("🚀 Enviar Chamado"):
+
+        if not nome or not descricao:
+            st.error("Preencha Nome e Descrição")
         else:
             chamado = {
                 "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "Usuario": st.session_state.nome,
-                "Origem": st.session_state.origem,
+                "Nome": nome,
+                "Origem": origem,
                 "Tipo": tipo,
                 "Descricao": descricao,
-                "Responsavel": responsavel,
                 "Status": "Aberto",
-                "Chat": [
-                    f"{st.session_state.nome}: Chamado aberto - {descricao}"
-                ]
+                "Responsavel": None,
+                "Chat": [f"{nome}: {descricao}"]
             }
 
             st.session_state.chamados.append(chamado)
-
-            st.success("Chamado enviado com sucesso")
-            st.rerun()
+            st.success("Chamado enviado com sucesso!")
 
 # ================= TELA ADMIN =================
 elif st.session_state.pagina == "admin":
 
-    st.title("Painel Admin")
+    st.markdown("<div class='topbar'><h1>Painel Administrativo</h1></div>", unsafe_allow_html=True)
 
     if st.button("Logout"):
         st.session_state.pagina = "inicio"
-        st.rerun()
 
     st.subheader("Gerenciar Responsáveis")
 
-    novo = st.text_input("Novo responsável")
-    if st.button("Adicionar"):
+    col1, col2 = st.columns(2)
+
+    novo = col1.text_input("Novo Responsável")
+    if col1.button("Adicionar"):
         if novo:
             st.session_state.responsaveis.append(novo.upper())
-            st.success("Adicionado")
 
-    remover = st.selectbox("Remover responsável", [""] + st.session_state.responsaveis)
-    if st.button("Remover"):
+    remover = col2.selectbox("Remover Responsável", [""] + st.session_state.responsaveis)
+    if col2.button("Remover"):
         if remover:
             st.session_state.responsaveis.remove(remover)
-            st.success("Removido")
 
     st.divider()
-
     st.subheader("Chamados")
 
     if not st.session_state.chamados:
         st.info("Nenhum chamado aberto.")
-    else:
-        for i, ch in enumerate(st.session_state.chamados):
 
-            with st.expander(f"{i+1} - {ch['Tipo']} - {ch['Status']}"):
+    for i, ch in enumerate(st.session_state.chamados):
 
-                st.write("Usuário:", ch["Usuario"])
-                st.write("Origem:", ch["Origem"])
-                st.write("Responsável:", ch["Responsavel"])
-                st.write("Descrição:", ch["Descricao"])
+        with st.expander(f"{ch['Tipo']} - {ch['Nome']}"):
 
-                novo_status = st.selectbox(
-                    "Status",
-                    ["Aberto","Em Atendimento","Finalizado"],
-                    index=["Aberto","Em Atendimento","Finalizado"].index(ch["Status"]),
-                    key=f"status{i}"
-                )
-                ch["Status"] = novo_status
+            # STATUS COLORIDO
+            if ch["Status"] == "Aberto":
+                st.markdown("<p class='status-aberto'>Aberto</p>", unsafe_allow_html=True)
+            elif ch["Status"] == "Em Atendimento":
+                st.markdown("<p class='status-andamento'>Em Atendimento</p>", unsafe_allow_html=True)
+            else:
+                st.markdown("<p class='status-finalizado'>Finalizado</p>", unsafe_allow_html=True)
 
-                resolvido = st.text_input("Resolvido por", key=f"res{i}")
-                if resolvido:
-                    ch["Resolvido por"] = resolvido
+            st.write("Origem:", ch["Origem"])
+            st.write("Descrição:", ch["Descricao"])
 
-                st.markdown("### Chat")
+            # ADMIN ESCOLHE RESPONSAVEL
+            responsavel = st.selectbox(
+                "Designar Responsável",
+                ["Selecione"] + st.session_state.responsaveis,
+                key=f"resp{i}"
+            )
 
-                for msg in ch["Chat"]:
-                    st.write(msg)
+            if st.button("Designar", key=f"btnresp{i}"):
+                if responsavel != "Selecione":
+                    ch["Responsavel"] = responsavel
+                    ch["Status"] = "Em Atendimento"
 
-                nova_msg = st.text_input("Mensagem", key=f"msg{i}")
+            # ALTERAR STATUS
+            novo_status = st.selectbox(
+                "Alterar Status",
+                ["Aberto","Em Atendimento","Finalizado"],
+                key=f"status{i}"
+            )
+            ch["Status"] = novo_status
 
-                if st.button("Enviar Mensagem", key=f"btn{i}"):
-                    if nova_msg:
-                        ch["Chat"].append(f"ADMIN: {nova_msg}")
-                        st.rerun()
+            st.markdown("### 💬 Chat")
 
-                if st.button("Excluir Chamado", key=f"del{i}"):
-                    st.session_state.chamados.pop(i)
-                    st.rerun()
+            for msg in ch["Chat"]:
+                st.write(msg)
+
+            nova_msg = st.text_input("Mensagem", key=f"msg{i}")
+
+            if st.button("Enviar Mensagem", key=f"btnmsg{i}"):
+                if nova_msg:
+                    ch["Chat"].append(f"ADMIN: {nova_msg}")
+
+            if st.button("Excluir Chamado", key=f"del{i}"):
+                st.session_state.chamados.pop(i)
+                st.success("Chamado excluído")
