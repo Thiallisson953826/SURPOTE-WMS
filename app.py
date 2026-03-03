@@ -2,128 +2,106 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# ==========================================
-# CONFIGURAÇÃO DA PÁGINA
-# ==========================================
+st.set_page_config(page_title="SUPORTE WMS", layout="wide")
 
-st.set_page_config(
-    page_title="SUPORTE WMS",
-    layout="wide"
-)
-
-# ==========================================
-# CSS PERSONALIZADO
-# ==========================================
-
+# =========================
+# CSS
+# =========================
 st.markdown("""
 <style>
-
-html, body, [class*="css"]  {
-    font-family: Arial;
-}
-
-.main {
-    border-top: 10px solid black;
-}
-
+.main { border-top: 10px solid black; }
 div[data-testid="stRadio"] > div {
     background-color: black;
-    padding: 15px;
-    border-radius: 0 0 15px 15px;
+    padding: 10px;
 }
-
 div[data-testid="stRadio"] label {
     color: white !important;
     font-weight: bold;
 }
-
 .stButton>button {
     background-color: black;
     color: white;
     font-weight: bold;
-    border-radius: 8px;
-    height: 45px;
 }
-
-.stTextInput>div>div>input {
-    border: 2px solid black;
-}
-
-.stSelectbox>div>div {
-    border: 2px solid black;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
+# =========================
 # SESSION STATE
-# ==========================================
+# =========================
+if "logado" not in st.session_state:
+    st.session_state.logado = False
+
+if "perfil" not in st.session_state:
+    st.session_state.perfil = ""
+
+if "responsaveis" not in st.session_state:
+    st.session_state.responsaveis = ["Thiallisson","Kelson","Edvaldo","Hernandes"]
 
 if "chamados" not in st.session_state:
-    st.session_state.chamados = pd.DataFrame(
-        columns=[
-            "Data",
-            "Tipo",
-            "Nota",
-            "Agenda",
-            "NCE",
-            "Etiqueta",
-            "Endereço",
-            "Endereço Saída",
-            "Endereço Entrada",
-            "Carga",
-            "Separação"
-        ]
-    )
+    st.session_state.chamados = []
 
-# ==========================================
-# FUNÇÃO VALIDAR CAMPOS
-# ==========================================
+# =========================
+# LOGIN
+# =========================
+if not st.session_state.logado:
 
-def validar_campos(tipo, dados):
-    obrigatorios = []
+    st.title("Login - Suporte WMS")
 
-    if tipo == "Recebimento":
-        obrigatorios = ["Nota", "NCE"]
+    usuario = st.text_input("Usuário")
+    nome = st.text_input("Nome")
+    origem = st.selectbox("Origem", ["TDC","IDC","PDC","DPC","FLD"])
+    senha = st.text_input("Senha (admin)", type="password")
 
-    elif tipo == "Armazenagem":
-        obrigatorios = ["Agenda", "Etiqueta"]
+    if st.button("Entrar"):
 
-    elif tipo == "Transferência":
-        obrigatorios = ["Endereço Saída", "Endereço Entrada", "NCE"]
+        if senha == "1234":
+            st.session_state.perfil = "Admin"
+        else:
+            st.session_state.perfil = "Usuario"
 
-    elif tipo == "Inventário":
-        obrigatorios = ["NCE", "Endereço"]
+        st.session_state.usuario = usuario
+        st.session_state.nome = nome
+        st.session_state.origem = origem
+        st.session_state.logado = True
+        st.rerun()
 
-    elif tipo == "Separação":
-        obrigatorios = ["Carga", "Nota"]
+    st.stop()
 
-    elif tipo == "Expedição":
-        obrigatorios = ["Carga", "Separação", "Nota"]
+# =========================
+# MENU
+# =========================
+menu = st.radio("", ["Abrir Chamado","Admin","Logout"], horizontal=True)
 
-    for campo in obrigatorios:
+if menu == "Logout":
+    st.session_state.logado = False
+    st.rerun()
+
+# =========================
+# VALIDAR
+# =========================
+def validar(tipo,dados):
+    regras = {
+        "Recebimento":["Nota","NCE"],
+        "Armazenagem":["Agenda","Etiqueta"],
+        "Transferência":["Endereço Saída","Endereço Entrada","NCE"],
+        "Inventário":["NCE","Endereço"],
+        "Separação":["Carga","Nota"],
+        "Expedição":["Carga","Separação","Nota"]
+    }
+    for campo in regras[tipo]:
         if not dados.get(campo):
-            return False, campo
+            return False,campo
+    return True,None
 
-    return True, None
-
-# ==========================================
-# FUNÇÃO ABRIR CHAMADO
-# ==========================================
-
-def abrir_chamado():
+# =========================
+# ABRIR CHAMADO
+# =========================
+if menu == "Abrir Chamado":
 
     st.title("Abertura de Chamado")
 
-    tipo = st.selectbox("Tipo de Operação", [
-        "Recebimento",
-        "Armazenagem",
-        "Transferência",
-        "Inventário",
-        "Separação",
-        "Expedição"
-    ])
+    tipo = st.selectbox("Tipo",["Recebimento","Armazenagem","Transferência","Inventário","Separação","Expedição"])
 
     nota = agenda = nce = etiqueta = endereco = ""
     end_saida = end_entrada = carga = separacao = ""
@@ -139,8 +117,8 @@ def abrir_chamado():
         endereco = st.text_input("Endereço (Opcional)")
 
     elif tipo == "Transferência":
-        end_saida = st.text_input("Endereço de Saída *")
-        end_entrada = st.text_input("Endereço de Entrada *")
+        end_saida = st.text_input("Endereço Saída *")
+        end_entrada = st.text_input("Endereço Entrada *")
         nce = st.text_input("NCE *")
 
     elif tipo == "Inventário":
@@ -157,84 +135,87 @@ def abrir_chamado():
         separacao = st.text_input("Separação *")
         nota = st.text_input("Nota *")
 
+    descricao = st.text_area("Descrição detalhada do erro *")
+
+    responsavel = st.selectbox("Responsável", st.session_state.responsaveis)
+
     if st.button("Criar Chamado"):
 
         dados = {
-            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "Tipo": tipo,
-            "Nota": nota,
-            "Agenda": agenda,
-            "NCE": nce,
-            "Etiqueta": etiqueta,
-            "Endereço": endereco,
-            "Endereço Saída": end_saida,
-            "Endereço Entrada": end_entrada,
-            "Carga": carga,
-            "Separação": separacao
+            "Data":datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Tipo":tipo,
+            "Nota":nota,
+            "Agenda":agenda,
+            "NCE":nce,
+            "Etiqueta":etiqueta,
+            "Endereço":endereco,
+            "Endereço Saída":end_saida,
+            "Endereço Entrada":end_entrada,
+            "Carga":carga,
+            "Separação":separacao,
+            "Descrição":descricao,
+            "Responsável":responsavel,
+            "Status":"Aberto",
+            "Chat":[]
         }
 
-        valido, campo = validar_campos(tipo, dados)
+        valido,campo = validar(tipo,dados)
 
-        if not valido:
-            st.error(f"O campo '{campo}' é obrigatório!")
-            return
+        if not descricao:
+            st.error("Descrição é obrigatória")
+        elif not valido:
+            st.error(f"Campo obrigatório: {campo}")
+        else:
+            st.session_state.chamados.append(dados)
+            st.success("Chamado criado")
 
-        novo_df = pd.DataFrame([dados])
-        st.session_state.chamados = pd.concat(
-            [st.session_state.chamados, novo_df],
-            ignore_index=True
-        )
+# =========================
+# ADMIN
+# =========================
+if menu == "Admin":
 
-        st.success("Chamado criado com sucesso!")
-
-# ==========================================
-# FUNÇÃO ADMIN
-# ==========================================
-
-def tela_admin():
+    if st.session_state.perfil != "Admin":
+        st.error("Acesso restrito ao Admin")
+        st.stop()
 
     st.title("Painel Administrativo")
 
-    df = st.session_state.chamados
+    # Gerenciar Responsáveis
+    st.subheader("Gerenciar Responsáveis")
 
-    if df.empty:
-        st.warning("Nenhum chamado registrado.")
-        return
+    novo_nome = st.text_input("Novo Responsável")
+    if st.button("Adicionar"):
+        if novo_nome:
+            st.session_state.responsaveis.append(novo_nome)
 
-    st.dataframe(df, use_container_width=True)
+    remover = st.selectbox("Remover Responsável", [""]+st.session_state.responsaveis)
+    if st.button("Remover"):
+        if remover:
+            st.session_state.responsaveis.remove(remover)
 
-    st.subheader("Filtros")
+    st.divider()
 
-    filtro_tipo = st.selectbox(
-        "Filtrar por Tipo",
-        ["Todos"] + list(df["Tipo"].unique())
-    )
+    # Chamados
+    for i,ch in enumerate(st.session_state.chamados):
 
-    if filtro_tipo != "Todos":
-        df = df[df["Tipo"] == filtro_tipo]
+        with st.expander(f"{i+1} - {ch['Tipo']} - {ch['Status']}"):
 
-    st.dataframe(df, use_container_width=True)
+            st.write(ch)
 
-    if st.button("Limpar Todos Chamados"):
-        st.session_state.chamados = df.iloc[0:0]
-        st.success("Chamados apagados.")
+            novo_status = st.selectbox("Status",["Aberto","Em Atendimento","Finalizado"], key=f"status{i}")
+            ch["Status"] = novo_status
 
-# ==========================================
-# MENU SUPERIOR
-# ==========================================
+            resolvido_por = st.text_input("Resolvido por", key=f"resolvido{i}")
+            if resolvido_por:
+                ch["Resolvido por"] = resolvido_por
 
-menu = st.radio(
-    "",
-    ["Abrir Chamado", "Admin"],
-    horizontal=True
-)
+            mensagem = st.text_input("Chat", key=f"chat{i}")
+            if st.button("Enviar", key=f"btn{i}"):
+                ch["Chat"].append(f"{st.session_state.nome}: {mensagem}")
 
-# ==========================================
-# RENDERIZAÇÃO
-# ==========================================
+            for msg in ch["Chat"]:
+                st.write(msg)
 
-if menu == "Abrir Chamado":
-    abrir_chamado()
-
-elif menu == "Admin":
-    tela_admin()
+            if st.button("Excluir Chamado", key=f"exc{i}"):
+                st.session_state.chamados.pop(i)
+                st.rerun()
