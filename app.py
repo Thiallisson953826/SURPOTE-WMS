@@ -1,194 +1,229 @@
 import streamlit as st
 import uuid
-import re
 from datetime import datetime
-import pandas as pd
-import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="WMS Suporte", layout="wide")
 
 # ================= SESSION =================
+if "usuarios" not in st.session_state:
+    st.session_state.usuarios = {}
+
 if "chamados" not in st.session_state:
     st.session_state.chamados = {}
 
-if "admin_logado" not in st.session_state:
-    st.session_state.admin_logado = False
+if "perfil" not in st.session_state:
+    st.session_state.perfil = None
+
+if "usuario_logado" not in st.session_state:
+    st.session_state.usuario_logado = None
 
 # ================= FUNÇÕES =================
-def validar_nce(nce):
-    return re.match(r"^\d{6,}\.\d+$", nce)
-
 def agora():
     return datetime.now().strftime("%d/%m/%Y %H:%M")
 
-# ======================================================
-# =================== LOGIN ADMIN =======================
-# ======================================================
-st.sidebar.title("Administração")
+def criar_chamado(dados):
+    id_chamado = str(uuid.uuid4())[:8]
+    st.session_state.chamados[id_chamado] = dados
+    return id_chamado
 
-senha = st.sidebar.text_input("Senha Admin", type="password")
+# =========================================================
+# ===================== LOGIN =============================
+# =========================================================
 
-if st.sidebar.button("Entrar como Admin"):
-    if senha == "1234":
-        st.session_state.admin_logado = True
-    else:
-        st.sidebar.error("Senha incorreta")
+st.sidebar.title("Login")
 
-# ======================================================
-# ======================== ADMIN ========================
-# ======================================================
-if st.session_state.admin_logado:
+tipo = st.sidebar.radio("Tipo de Acesso", ["Usuário", "Admin"])
 
-    st.title("Painel Administrativo")
+if tipo == "Usuário":
+    nome = st.sidebar.text_input("Nome")
+    origem = st.sidebar.selectbox("Origem", ["TDC","IDC","PDC","DPC","FLD"])
 
-    chamados = st.session_state.chamados
+    if st.sidebar.button("Entrar"):
+        if nome:
+            st.session_state.perfil = "Usuario"
+            st.session_state.usuario_logado = nome
+            st.session_state.usuarios[nome] = origem
+            st.rerun()
 
-    total = len(chamados)
-    aberto = sum(1 for c in chamados.values() if c["status"]=="Aberto")
-    atendimento = sum(1 for c in chamados.values() if c["status"]=="Em Atendimento")
-    finalizado = sum(1 for c in chamados.values() if c["status"]=="Finalizado")
-
-    c1,c2,c3,c4 = st.columns(4)
-    c1.metric("Total", total)
-    c2.metric("Aberto", aberto)
-    c3.metric("Em Atendimento", atendimento)
-    c4.metric("Finalizado", finalizado)
-
-    st.divider()
-
-    # ===== GRÁFICO POR ORIGEM =====
-    if chamados:
-        df = pd.DataFrame(chamados.values())
-        origem_count = df["origem"].value_counts()
-
-        fig, ax = plt.subplots()
-        origem_count.plot(kind="bar", ax=ax)
-        st.pyplot(fig)
-
-    st.divider()
-
-    filtro_status = st.selectbox("Filtrar por Status", ["Todos","Aberto","Em Atendimento","Finalizado"])
-    busca_nome = st.text_input("Buscar por Nome")
-
-    chamados_filtrados = {}
-
-    for id_ch, ch in chamados.items():
-        if (filtro_status=="Todos" or ch["status"]==filtro_status) and \
-           (busca_nome=="" or busca_nome.lower() in ch["nome"].lower()):
-            chamados_filtrados[id_ch] = ch
-
-    if chamados_filtrados:
-
-        chamado_id = st.selectbox("Selecionar Chamado", list(chamados_filtrados.keys()))
-        chamado = chamados_filtrados[chamado_id]
-
-        st.subheader("Informações")
-        st.write("Código:", chamado_id)
-        st.write("Nome:", chamado["nome"])
-        st.write("Origem:", chamado["origem"])
-        st.write("Criado em:", chamado["data"])
-        st.write("Status:", chamado["status"])
-        st.write("Critério:", chamado["criterio"])
-        st.write(chamado["dados"])
-
-        if chamado["status"] != "Finalizado":
-            novo_status = st.selectbox("Alterar Status", ["Aberto","Em Atendimento","Finalizado"])
-            if st.button("Atualizar Status"):
-                chamado["status"] = novo_status
-                chamado["chat"].append(f"Sistema: Status alterado para {novo_status}")
-                st.rerun()
-
-        st.divider()
-        st.subheader("Chat")
-
-        for msg in chamado["chat"]:
-            st.write(msg)
-
-        if chamado["status"] != "Finalizado":
-            resposta = st.text_input("Responder")
-            if st.button("Enviar Resposta"):
-                if resposta:
-                    chamado["status"] = "Em Atendimento"
-                    chamado["chat"].append(f"Admin: {resposta}")
-                    st.rerun()
-
-    else:
-        st.info("Nenhum chamado encontrado.")
-
-# ======================================================
-# ======================= USUÁRIO =======================
-# ======================================================
 else:
+    senha = st.sidebar.text_input("Senha Admin", type="password")
+    if st.sidebar.button("Entrar"):
+        if senha == "1234":
+            st.session_state.perfil = "Admin"
+            st.rerun()
+        else:
+            st.sidebar.error("Senha incorreta")
 
-    st.title("Abrir Chamado")
+# =========================================================
+# ===================== USUÁRIO ===========================
+# =========================================================
 
-    nome = st.text_input("Seu Nome")
-    origem = st.selectbox("Origem", ["TDC","IDC","PDC","DPC","FLD"])
+if st.session_state.perfil == "Usuario":
 
-    criterio = st.selectbox("Critério", [
+    st.title("WMS - Suporte")
+
+    operacao = st.selectbox("Operação", [
         "Recebimento",
         "Armazenagem",
-        "Inventário",
+        "Transferencia",
+        "Inventarios",
         "Separação",
         "Expedição"
     ])
 
-    erro = st.text_area("Descreva o problema")
-    agenda = st.text_input("Agenda *")
-    etiqueta = st.text_input("Etiqueta *")
-    nce = st.text_input("NCE (ex: 196369.65421378) *")
+    dados_form = {}
+    obrigatorios_ok = True
+
+    if operacao == "Recebimento":
+        dados_form["Nota"] = st.text_input("Nota *")
+        dados_form["Agenda"] = st.text_input("Agenda (Opcional)")
+        dados_form["NCE"] = st.text_input("NCE *")
+
+        if not dados_form["Nota"] or not dados_form["NCE"]:
+            obrigatorios_ok = False
+
+    if operacao == "Armazenagem":
+        dados_form["Agenda"] = st.text_input("Agenda *")
+        dados_form["Etiqueta"] = st.text_input("Etiqueta *")
+        dados_form["Endereço"] = st.text_input("Endereço (Opcional)")
+
+        if not dados_form["Agenda"] or not dados_form["Etiqueta"]:
+            obrigatorios_ok = False
+
+    if operacao == "Transferencia":
+        dados_form["Endereço Saida"] = st.text_input("Endereço Saída *")
+        dados_form["Endereço Entrada"] = st.text_input("Endereço Entrada *")
+        dados_form["NCE"] = st.text_input("NCE *")
+
+        if not dados_form["Endereço Saida"] or not dados_form["Endereço Entrada"] or not dados_form["NCE"]:
+            obrigatorios_ok = False
+
+    if operacao == "Inventarios":
+        dados_form["NCE"] = st.text_input("NCE *")
+        dados_form["Endereço"] = st.text_input("Endereço *")
+
+        if not dados_form["NCE"] or not dados_form["Endereço"]:
+            obrigatorios_ok = False
+
+    if operacao == "Separação":
+        dados_form["Carga"] = st.text_input("Carga *")
+        dados_form["Separação"] = st.text_input("Separação (Opcional)")
+        dados_form["Nota"] = st.text_input("Nota *")
+
+        if not dados_form["Carga"] or not dados_form["Nota"]:
+            obrigatorios_ok = False
+
+    if operacao == "Expedição":
+        dados_form["Carga"] = st.text_input("Carga *")
+        dados_form["Separação"] = st.text_input("Separação *")
+        dados_form["Nota"] = st.text_input("Nota *")
+
+        if not dados_form["Carga"] or not dados_form["Separação"] or not dados_form["Nota"]:
+            obrigatorios_ok = False
+
+    detalhe = st.text_area("Detalhe do Problema *")
 
     if st.button("Abrir Chamado"):
-        if nome and agenda and etiqueta and validar_nce(nce):
-
-            id_chamado = str(uuid.uuid4())[:8]
-
-            st.session_state.chamados[id_chamado] = {
-                "nome": nome,
-                "origem": origem,
-                "criterio": criterio,
-                "dados": {
-                    "Agenda": agenda,
-                    "Etiqueta": etiqueta,
-                    "NCE": nce
-                },
+        if obrigatorios_ok and detalhe:
+            id_ch = criar_chamado({
+                "usuario": st.session_state.usuario_logado,
+                "origem": st.session_state.usuarios[st.session_state.usuario_logado],
+                "operacao": operacao,
+                "dados": dados_form,
+                "detalhe": detalhe,
                 "status": "Aberto",
                 "data": agora(),
                 "chat": [
                     f"Sistema: Chamado aberto em {agora()}",
-                    f"Problema: {erro}"
+                    f"Usuário: {detalhe}"
                 ]
-            }
-
-            st.success(f"Chamado aberto! Código: {id_chamado}")
+            })
+            st.success(f"Chamado aberto! Código: {id_ch}")
             st.rerun()
         else:
-            st.error("Preencha corretamente os campos obrigatórios.")
+            st.error("Preencha todos os campos obrigatórios.")
 
     st.divider()
-    st.subheader("Consultar Chamado")
+    st.subheader("Meus Chamados")
 
-    codigo = st.text_input("Digite o código do chamado")
+    for id_ch, ch in st.session_state.chamados.items():
+        if ch["usuario"] == st.session_state.usuario_logado:
 
-    if codigo in st.session_state.chamados:
-        chamado = st.session_state.chamados[codigo]
+            st.markdown(f"### Chamado {id_ch} - {ch['status']}")
+            st.write("Operação:", ch["operacao"])
+            st.write("Dados:", ch["dados"])
 
-        st.write("Nome:", chamado["nome"])
-        st.write("Status:", chamado["status"])
-        st.write("Origem:", chamado["origem"])
-        st.write("Criado em:", chamado["data"])
+            st.subheader("Chat")
+            for msg in ch["chat"]:
+                st.write(msg)
 
-        st.subheader("Chat")
+            if ch["status"] != "Resolvido":
+                msg = st.text_input(f"Mensagem {id_ch}", key=id_ch)
+                if st.button(f"Enviar {id_ch}"):
+                    if msg:
+                        ch["chat"].append(f"{st.session_state.usuario_logado}: {msg}")
+                        ch["status"] = "Em Atendimento"
+                        st.rerun()
 
-        for msg in chamado["chat"]:
-            st.write(msg)
+# =========================================================
+# ===================== ADMIN =============================
+# =========================================================
 
-        if chamado["status"] != "Finalizado":
-            msg = st.text_input("Enviar mensagem")
-            if st.button("Enviar Mensagem"):
-                if msg:
-                    chamado["chat"].append(f"{chamado['nome']}: {msg}")
+if st.session_state.perfil == "Admin":
+
+    st.title("Painel Administrativo")
+
+    menu = st.sidebar.radio("Menu", ["Dashboard","Chamados","Usuários"])
+
+    if menu == "Dashboard":
+        total = len(st.session_state.chamados)
+        aberto = sum(1 for c in st.session_state.chamados.values() if c["status"]=="Aberto")
+        atendimento = sum(1 for c in st.session_state.chamados.values() if c["status"]=="Em Atendimento")
+        resolvido = sum(1 for c in st.session_state.chamados.values() if c["status"]=="Resolvido")
+
+        c1,c2,c3,c4 = st.columns(4)
+        c1.metric("Total", total)
+        c2.metric("Aberto", aberto)
+        c3.metric("Em Atendimento", atendimento)
+        c4.metric("Resolvido", resolvido)
+
+    if menu == "Chamados":
+
+        for id_ch, ch in list(st.session_state.chamados.items()):
+
+            st.markdown(f"## {id_ch} - {ch['status']}")
+            st.write("Usuário:", ch["usuario"])
+            st.write("Origem:", ch["origem"])
+            st.write("Operação:", ch["operacao"])
+            st.write("Dados:", ch["dados"])
+
+            novo_status = st.selectbox("Alterar Status", ["Aberto","Em Atendimento","Resolvido"], key=id_ch)
+            if st.button("Atualizar", key="u"+id_ch):
+                ch["status"] = novo_status
+                ch["chat"].append(f"Sistema: Status alterado para {novo_status}")
+                st.rerun()
+
+            if st.button("Excluir Chamado", key="e"+id_ch):
+                del st.session_state.chamados[id_ch]
+                st.rerun()
+
+            st.subheader("Chat")
+            for msg in ch["chat"]:
+                st.write(msg)
+
+            msg_admin = st.text_input("Responder", key="r"+id_ch)
+            if st.button("Enviar Resposta", key="b"+id_ch):
+                if msg_admin:
+                    ch["chat"].append(f"Admin: {msg_admin}")
+                    ch["status"] = "Em Atendimento"
                     st.rerun()
 
-    elif codigo != "":
-        st.error("Chamado não encontrado.")
+            st.divider()
+
+    if menu == "Usuários":
+
+        for user in list(st.session_state.usuarios.keys()):
+            st.write(user, "-", st.session_state.usuarios[user])
+            if st.button(f"Excluir {user}"):
+                del st.session_state.usuarios[user]
+                st.rerun()
