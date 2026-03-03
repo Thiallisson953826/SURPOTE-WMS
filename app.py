@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 
 st.set_page_config(page_title="SUPORTE WMS", layout="wide")
@@ -10,14 +9,6 @@ st.set_page_config(page_title="SUPORTE WMS", layout="wide")
 st.markdown("""
 <style>
 .main { border-top: 10px solid black; }
-div[data-testid="stRadio"] > div {
-    background-color: black;
-    padding: 10px;
-}
-div[data-testid="stRadio"] label {
-    color: white !important;
-    font-weight: bold;
-}
 .stButton>button {
     background-color: black;
     color: white;
@@ -27,13 +18,10 @@ div[data-testid="stRadio"] label {
 """, unsafe_allow_html=True)
 
 # =========================
-# SESSION STATE
+# SESSION STATE INICIAL
 # =========================
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-
-if "perfil" not in st.session_state:
-    st.session_state.perfil = ""
+if "pagina" not in st.session_state:
+    st.session_state.pagina = "inicio"
 
 if "responsaveis" not in st.session_state:
     st.session_state.responsaveis = ["Thiallisson","Kelson","Edvaldo","Hernandes"]
@@ -42,79 +30,97 @@ if "chamados" not in st.session_state:
     st.session_state.chamados = []
 
 # =========================
-# LOGIN
+# PAGINA INICIAL
 # =========================
-if not st.session_state.logado:
+if st.session_state.pagina == "inicio":
 
-    st.title("Login - Suporte WMS")
+    st.title("SUPORTE WMS")
+
+    col1, col2 = st.columns(2)
+
+    if col1.button("Login Usuário"):
+        st.session_state.pagina = "login_usuario"
+        st.rerun()
+
+    if col2.button("Login Admin"):
+        st.session_state.pagina = "login_admin"
+        st.rerun()
+
+# =========================
+# LOGIN USUARIO
+# =========================
+elif st.session_state.pagina == "login_usuario":
+
+    st.title("Login Usuário")
 
     usuario = st.text_input("Usuário")
     nome = st.text_input("Nome")
     origem = st.selectbox("Origem", ["TDC","IDC","PDC","DPC","FLD"])
-    senha = st.text_input("Senha (admin)", type="password")
 
-    if st.button("Entrar"):
+    col1, col2 = st.columns(2)
 
-        if senha == "1234":
-            st.session_state.perfil = "Admin"
-        else:
-            st.session_state.perfil = "Usuario"
+    if col1.button("Entrar"):
+        if usuario and nome:
+            st.session_state.usuario = usuario
+            st.session_state.nome = nome
+            st.session_state.origem = origem
+            st.session_state.pagina = "usuario"
+            st.rerun()
 
-        st.session_state.usuario = usuario
-        st.session_state.nome = nome
-        st.session_state.origem = origem
-        st.session_state.logado = True
+    if col2.button("Voltar"):
+        st.session_state.pagina = "inicio"
         st.rerun()
 
-    st.stop()
+# =========================
+# LOGIN ADMIN
+# =========================
+elif st.session_state.pagina == "login_admin":
+
+    st.title("Login Admin")
+
+    senha = st.text_input("Senha", type="password")
+
+    col1, col2 = st.columns(2)
+
+    if col1.button("Entrar"):
+        if senha == "1234":
+            st.session_state.pagina = "admin"
+            st.rerun()
+        else:
+            st.error("Senha incorreta")
+
+    if col2.button("Voltar"):
+        st.session_state.pagina = "inicio"
+        st.rerun()
 
 # =========================
-# MENU
+# TELA USUARIO
 # =========================
-menu = st.radio("", ["Abrir Chamado","Admin","Logout"], horizontal=True)
+elif st.session_state.pagina == "usuario":
 
-if menu == "Logout":
-    st.session_state.logado = False
-    st.rerun()
+    st.title("Abrir Chamado")
 
-# =========================
-# VALIDAR
-# =========================
-def validar(tipo,dados):
-    regras = {
-        "Recebimento":["Nota","NCE"],
-        "Armazenagem":["Agenda","Etiqueta"],
-        "Transferência":["Endereço Saída","Endereço Entrada","NCE"],
-        "Inventário":["NCE","Endereço"],
-        "Separação":["Carga","Nota"],
-        "Expedição":["Carga","Separação","Nota"]
-    }
-    for campo in regras[tipo]:
-        if not dados.get(campo):
-            return False,campo
-    return True,None
+    if st.button("Logout"):
+        st.session_state.pagina = "inicio"
+        st.rerun()
 
-# =========================
-# ABRIR CHAMADO
-# =========================
-if menu == "Abrir Chamado":
-
-    st.title("Abertura de Chamado")
-
-    tipo = st.selectbox("Tipo",["Recebimento","Armazenagem","Transferência","Inventário","Separação","Expedição"])
+    tipo = st.selectbox("Tipo",[
+        "Recebimento","Armazenagem","Transferência",
+        "Inventário","Separação","Expedição"
+    ])
 
     nota = agenda = nce = etiqueta = endereco = ""
     end_saida = end_entrada = carga = separacao = ""
 
     if tipo == "Recebimento":
         nota = st.text_input("Nota *")
-        agenda = st.text_input("Agenda (Opcional)")
+        agenda = st.text_input("Agenda")
         nce = st.text_input("NCE *")
 
     elif tipo == "Armazenagem":
         agenda = st.text_input("Agenda *")
         etiqueta = st.text_input("Etiqueta *")
-        endereco = st.text_input("Endereço (Opcional)")
+        endereco = st.text_input("Endereço")
 
     elif tipo == "Transferência":
         end_saida = st.text_input("Endereço Saída *")
@@ -127,7 +133,7 @@ if menu == "Abrir Chamado":
 
     elif tipo == "Separação":
         carga = st.text_input("Carga *")
-        separacao = st.text_input("Separação (Opcional)")
+        separacao = st.text_input("Separação")
         nota = st.text_input("Nota *")
 
     elif tipo == "Expedição":
@@ -135,87 +141,80 @@ if menu == "Abrir Chamado":
         separacao = st.text_input("Separação *")
         nota = st.text_input("Nota *")
 
-    descricao = st.text_area("Descrição detalhada do erro *")
+    descricao = st.text_area("Descrição do erro *")
 
     responsavel = st.selectbox("Responsável", st.session_state.responsaveis)
 
     if st.button("Criar Chamado"):
 
-        dados = {
-            "Data":datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "Tipo":tipo,
-            "Nota":nota,
-            "Agenda":agenda,
-            "NCE":nce,
-            "Etiqueta":etiqueta,
-            "Endereço":endereco,
-            "Endereço Saída":end_saida,
-            "Endereço Entrada":end_entrada,
-            "Carga":carga,
-            "Separação":separacao,
-            "Descrição":descricao,
-            "Responsável":responsavel,
-            "Status":"Aberto",
-            "Chat":[]
+        chamado = {
+            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Usuario": st.session_state.nome,
+            "Tipo": tipo,
+            "Nota": nota,
+            "Agenda": agenda,
+            "NCE": nce,
+            "Etiqueta": etiqueta,
+            "Endereço": endereco,
+            "Endereço Saída": end_saida,
+            "Endereço Entrada": end_entrada,
+            "Carga": carga,
+            "Separação": separacao,
+            "Descrição": descricao,
+            "Responsável": responsavel,
+            "Status": "Aberto",
+            "Chat": [f"{st.session_state.nome}: Chamado aberto"]
         }
 
-        valido,campo = validar(tipo,dados)
+        st.session_state.chamados.append(chamado)
 
-        if not descricao:
-            st.error("Descrição é obrigatória")
-        elif not valido:
-            st.error(f"Campo obrigatório: {campo}")
-        else:
-            st.session_state.chamados.append(dados)
-            st.success("Chamado criado")
+        st.success("Chamado criado e enviado ao Admin")
+        st.rerun()
 
 # =========================
-# ADMIN
+# TELA ADMIN
 # =========================
-if menu == "Admin":
+elif st.session_state.pagina == "admin":
 
-    if st.session_state.perfil != "Admin":
-        st.error("Acesso restrito ao Admin")
-        st.stop()
+    st.title("Painel Admin")
 
-    st.title("Painel Administrativo")
+    if st.button("Logout"):
+        st.session_state.pagina = "inicio"
+        st.rerun()
 
-    # Gerenciar Responsáveis
     st.subheader("Gerenciar Responsáveis")
 
-    novo_nome = st.text_input("Novo Responsável")
+    novo = st.text_input("Novo Nome")
     if st.button("Adicionar"):
-        if novo_nome:
-            st.session_state.responsaveis.append(novo_nome)
-
-    remover = st.selectbox("Remover Responsável", [""]+st.session_state.responsaveis)
-    if st.button("Remover"):
-        if remover:
-            st.session_state.responsaveis.remove(remover)
+        if novo:
+            st.session_state.responsaveis.append(novo)
 
     st.divider()
 
-    # Chamados
-    for i,ch in enumerate(st.session_state.chamados):
+    for i, ch in enumerate(st.session_state.chamados):
 
         with st.expander(f"{i+1} - {ch['Tipo']} - {ch['Status']}"):
 
             st.write(ch)
 
-            novo_status = st.selectbox("Status",["Aberto","Em Atendimento","Finalizado"], key=f"status{i}")
-            ch["Status"] = novo_status
+            status = st.selectbox(
+                "Status",
+                ["Aberto","Em Atendimento","Finalizado"],
+                key=f"status{i}"
+            )
+            ch["Status"] = status
 
-            resolvido_por = st.text_input("Resolvido por", key=f"resolvido{i}")
-            if resolvido_por:
-                ch["Resolvido por"] = resolvido_por
+            resolver = st.text_input("Resolvido por", key=f"res{i}")
+            if resolver:
+                ch["Resolvido por"] = resolver
 
-            mensagem = st.text_input("Chat", key=f"chat{i}")
+            msg = st.text_input("Mensagem", key=f"chat{i}")
             if st.button("Enviar", key=f"btn{i}"):
-                ch["Chat"].append(f"{st.session_state.nome}: {mensagem}")
+                ch["Chat"].append(f"Admin: {msg}")
 
-            for msg in ch["Chat"]:
-                st.write(msg)
+            for m in ch["Chat"]:
+                st.write(m)
 
-            if st.button("Excluir Chamado", key=f"exc{i}"):
+            if st.button("Excluir", key=f"del{i}"):
                 st.session_state.chamados.pop(i)
                 st.rerun()
