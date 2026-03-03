@@ -1,219 +1,240 @@
 import streamlit as st
-import sqlite3
-import uuid
-from datetime import datetime
 import pandas as pd
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import inch
-from streamlit_autorefresh import st_autorefresh
+from datetime import datetime
 
-st.set_page_config(page_title="WMS Suporte", layout="wide")
+# ==========================================
+# CONFIGURAÇÃO DA PÁGINA
+# ==========================================
 
-# ================= AUTO REFRESH =================
-st_autorefresh(interval=3000, key="refresh")
+st.set_page_config(
+    page_title="SUPORTE WMS",
+    layout="wide"
+)
 
-# ================= ESTILO =================
+# ==========================================
+# CSS PERSONALIZADO
+# ==========================================
+
 st.markdown("""
 <style>
-.main {background-color:#eef2f7;}
-.block-container {padding-top:2rem;}
-.card {
-    background:white;
-    padding:20px;
-    border-radius:12px;
-    box-shadow:0px 4px 10px rgba(0,0,0,0.05);
-    margin-bottom:20px;
+
+html, body, [class*="css"]  {
+    font-family: Arial;
 }
-.chat-box {
-    background:#f8f9fa;
-    padding:10px;
-    border-radius:8px;
-    margin-bottom:5px;
+
+.main {
+    border-top: 10px solid black;
 }
+
+div[data-testid="stRadio"] > div {
+    background-color: black;
+    padding: 15px;
+    border-radius: 0 0 15px 15px;
+}
+
+div[data-testid="stRadio"] label {
+    color: white !important;
+    font-weight: bold;
+}
+
 .stButton>button {
-    background-color:#004aad;
-    color:white;
-    border-radius:8px;
-    height:40px;
+    background-color: black;
+    color: white;
+    font-weight: bold;
+    border-radius: 8px;
+    height: 45px;
 }
+
+.stTextInput>div>div>input {
+    border: 2px solid black;
+}
+
+.stSelectbox>div>div {
+    border: 2px solid black;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# ================= BANCO =================
-conn = sqlite3.connect("wms.db", check_same_thread=False)
-c = conn.cursor()
+# ==========================================
+# SESSION STATE
+# ==========================================
 
-c.execute("""CREATE TABLE IF NOT EXISTS chamados (
-    id TEXT,
-    usuario TEXT,
-    origem TEXT,
-    operacao TEXT,
-    campos TEXT,
-    detalhe TEXT,
-    status TEXT,
-    responsavel TEXT,
-    data TEXT
-)""")
+if "chamados" not in st.session_state:
+    st.session_state.chamados = pd.DataFrame(
+        columns=[
+            "Data",
+            "Tipo",
+            "Nota",
+            "Agenda",
+            "NCE",
+            "Etiqueta",
+            "Endereço",
+            "Endereço Saída",
+            "Endereço Entrada",
+            "Carga",
+            "Separação"
+        ]
+    )
 
-c.execute("""CREATE TABLE IF NOT EXISTS chat (
-    id TEXT,
-    mensagem TEXT
-)""")
+# ==========================================
+# FUNÇÃO VALIDAR CAMPOS
+# ==========================================
 
-conn.commit()
+def validar_campos(tipo, dados):
+    obrigatorios = []
 
-# ================= LOGIN =================
-st.sidebar.title("Login")
-tipo = st.sidebar.radio("Tipo de Acesso",["Usuário","Admin"])
+    if tipo == "Recebimento":
+        obrigatorios = ["Nota", "NCE"]
 
-if tipo == "Usuário":
-    nome = st.sidebar.text_input("Nome")
-    origem = st.sidebar.selectbox("Origem",["TDC","IDC","PDC","DPC","FLD"])
+    elif tipo == "Armazenagem":
+        obrigatorios = ["Agenda", "Etiqueta"]
 
-    if st.sidebar.button("Entrar"):
-        if nome:
-            st.session_state.perfil="Usuario"
-            st.session_state.usuario=nome
-            st.session_state.origem=origem
-            st.rerun()
+    elif tipo == "Transferência":
+        obrigatorios = ["Endereço Saída", "Endereço Entrada", "NCE"]
 
-if tipo == "Admin":
-    senha = st.sidebar.text_input("Senha",type="password")
-    if st.sidebar.button("Entrar"):
-        if senha == "1234":
-            st.session_state.perfil="Admin"
-            st.rerun()
-        else:
-            st.error("Senha incorreta")
+    elif tipo == "Inventário":
+        obrigatorios = ["NCE", "Endereço"]
 
-# ======================================================
-# ================= USUÁRIO ============================
-# ======================================================
+    elif tipo == "Separação":
+        obrigatorios = ["Carga", "Nota"]
 
-if st.session_state.get("perfil") == "Usuario":
+    elif tipo == "Expedição":
+        obrigatorios = ["Carga", "Separação", "Nota"]
 
-    st.title("📦 WMS - Abertura de Chamado")
+    for campo in obrigatorios:
+        if not dados.get(campo):
+            return False, campo
 
-    with st.container():
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
+    return True, None
 
-        operacao = st.selectbox("Operação",[
-            "Recebimento","Armazenagem","Transferencia",
-            "Inventarios","Separação","Expedição"
-        ])
+# ==========================================
+# FUNÇÃO ABRIR CHAMADO
+# ==========================================
 
-        campos = {}
-        obrigatorio_ok = True
+def abrir_chamado():
 
-        # RECEBIMENTO
-        if operacao == "Recebimento":
-            campos["Nota"] = st.text_input("Nota *")
-            campos["Agenda"] = st.text_input("Agenda (Opcional)")
-            campos["NCE"] = st.text_input("NCE *")
+    st.title("Abertura de Chamado")
 
-            if not campos["Nota"] or not campos["NCE"]:
-                obrigatorio_ok = False
+    tipo = st.selectbox("Tipo de Operação", [
+        "Recebimento",
+        "Armazenagem",
+        "Transferência",
+        "Inventário",
+        "Separação",
+        "Expedição"
+    ])
 
-        # ARMAZENAGEM
-        if operacao == "Armazenagem":
-            campos["Agenda"] = st.text_input("Agenda *")
-            campos["Etiqueta"] = st.text_input("Etiqueta *")
-            campos["Endereço"] = st.text_input("Endereço (Opcional)")
+    nota = agenda = nce = etiqueta = endereco = ""
+    end_saida = end_entrada = carga = separacao = ""
 
-            if not campos["Agenda"] or not campos["Etiqueta"]:
-                obrigatorio_ok = False
+    if tipo == "Recebimento":
+        nota = st.text_input("Nota *")
+        agenda = st.text_input("Agenda (Opcional)")
+        nce = st.text_input("NCE *")
 
-        # TRANSFERENCIA
-        if operacao == "Transferencia":
-            campos["Endereço Saída"] = st.text_input("Endereço de Saída *")
-            campos["Endereço Entrada"] = st.text_input("Endereço de Entrada *")
-            campos["NCE"] = st.text_input("NCE *")
+    elif tipo == "Armazenagem":
+        agenda = st.text_input("Agenda *")
+        etiqueta = st.text_input("Etiqueta *")
+        endereco = st.text_input("Endereço (Opcional)")
 
-            if not campos["Endereço Saída"] or not campos["Endereço Entrada"] or not campos["NCE"]:
-                obrigatorio_ok = False
+    elif tipo == "Transferência":
+        end_saida = st.text_input("Endereço de Saída *")
+        end_entrada = st.text_input("Endereço de Entrada *")
+        nce = st.text_input("NCE *")
 
-        # INVENTARIOS
-        if operacao == "Inventarios":
-            campos["NCE"] = st.text_input("NCE *")
-            campos["Endereço"] = st.text_input("Endereço *")
+    elif tipo == "Inventário":
+        nce = st.text_input("NCE *")
+        endereco = st.text_input("Endereço *")
 
-            if not campos["NCE"] or not campos["Endereço"]:
-                obrigatorio_ok = False
+    elif tipo == "Separação":
+        carga = st.text_input("Carga *")
+        separacao = st.text_input("Separação (Opcional)")
+        nota = st.text_input("Nota *")
 
-        # SEPARAÇÃO
-        if operacao == "Separação":
-            campos["Carga"] = st.text_input("Carga *")
-            campos["Separação"] = st.text_input("Separação (Opcional)")
-            campos["Nota"] = st.text_input("Nota *")
+    elif tipo == "Expedição":
+        carga = st.text_input("Carga *")
+        separacao = st.text_input("Separação *")
+        nota = st.text_input("Nota *")
 
-            if not campos["Carga"] or not campos["Nota"]:
-                obrigatorio_ok = False
+    if st.button("Criar Chamado"):
 
-        # EXPEDIÇÃO
-        if operacao == "Expedição":
-            campos["Carga"] = st.text_input("Carga *")
-            campos["Separação"] = st.text_input("Separação *")
-            campos["Nota"] = st.text_input("Nota *")
+        dados = {
+            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Tipo": tipo,
+            "Nota": nota,
+            "Agenda": agenda,
+            "NCE": nce,
+            "Etiqueta": etiqueta,
+            "Endereço": endereco,
+            "Endereço Saída": end_saida,
+            "Endereço Entrada": end_entrada,
+            "Carga": carga,
+            "Separação": separacao
+        }
 
-            if not campos["Carga"] or not campos["Separação"] or not campos["Nota"]:
-                obrigatorio_ok = False
+        valido, campo = validar_campos(tipo, dados)
 
-        detalhe = st.text_area("Detalhe do Problema *")
+        if not valido:
+            st.error(f"O campo '{campo}' é obrigatório!")
+            return
 
-        if st.button("🚀 Abrir Chamado"):
-            if obrigatorio_ok and detalhe:
-                id_ch = str(uuid.uuid4())[:8]
-                data = datetime.now().strftime("%d/%m/%Y %H:%M")
+        novo_df = pd.DataFrame([dados])
+        st.session_state.chamados = pd.concat(
+            [st.session_state.chamados, novo_df],
+            ignore_index=True
+        )
 
-                c.execute("INSERT INTO chamados VALUES (?,?,?,?,?,?,?,?,?)",
-                    (id_ch,
-                     st.session_state.usuario,
-                     st.session_state.origem,
-                     operacao,
-                     str(campos),
-                     detalhe,
-                     "Aberto",
-                     "",
-                     data))
+        st.success("Chamado criado com sucesso!")
 
-                c.execute("INSERT INTO chat VALUES (?,?)",
-                    (id_ch,f"{st.session_state.usuario}: {detalhe}"))
+# ==========================================
+# FUNÇÃO ADMIN
+# ==========================================
 
-                conn.commit()
-                st.success("Chamado aberto com sucesso!")
-            else:
-                st.error("Preencha todos os campos obrigatórios!")
+def tela_admin():
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.title("Painel Administrativo")
 
-    # HISTÓRICO
-    st.subheader("📋 Meus Chamados")
-    df = pd.read_sql("SELECT * FROM chamados",conn)
-    meus = df[df.usuario == st.session_state.usuario]
+    df = st.session_state.chamados
 
-    for _,ch in meus.iterrows():
+    if df.empty:
+        st.warning("Nenhum chamado registrado.")
+        return
 
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown(f"### Chamado {ch.id} - {ch.status}")
-        st.write("Operação:",ch.operacao)
-        st.write("Dados:",ch.campos)
+    st.dataframe(df, use_container_width=True)
 
-        if ch.responsavel:
-            st.write("Responsável:",ch.responsavel)
+    st.subheader("Filtros")
 
-        chat_df = pd.read_sql(f"SELECT * FROM chat WHERE id='{ch.id}'",conn)
-        for _,m in chat_df.iterrows():
-            st.markdown(f"<div class='chat-box'>{m.mensagem}</div>", unsafe_allow_html=True)
+    filtro_tipo = st.selectbox(
+        "Filtrar por Tipo",
+        ["Todos"] + list(df["Tipo"].unique())
+    )
 
-        if ch.status != "Resolvido":
-            msg = st.text_input("Mensagem",key=ch.id)
-            if st.button("Enviar",key="u"+ch.id):
-                if msg:
-                    c.execute("INSERT INTO chat VALUES (?,?)",
-                        (ch.id,f"{st.session_state.usuario}: {msg}"))
-                    c.execute("UPDATE chamados SET status='Em Atendimento' WHERE id=?",(ch.id,))
-                    conn.commit()
-                    st.rerun()
+    if filtro_tipo != "Todos":
+        df = df[df["Tipo"] == filtro_tipo]
 
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.dataframe(df, use_container_width=True)
+
+    if st.button("Limpar Todos Chamados"):
+        st.session_state.chamados = df.iloc[0:0]
+        st.success("Chamados apagados.")
+
+# ==========================================
+# MENU SUPERIOR
+# ==========================================
+
+menu = st.radio(
+    "",
+    ["Abrir Chamado", "Admin"],
+    horizontal=True
+)
+
+# ==========================================
+# RENDERIZAÇÃO
+# ==========================================
+
+if menu == "Abrir Chamado":
+    abrir_chamado()
+
+elif menu == "Admin":
+    tela_admin()
